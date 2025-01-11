@@ -49,7 +49,7 @@ async function fetchNFTs(userAddress) {
 
 
 async function displayNFTs(userAddress) {
-    const totalTokens = 313; // Total number of tokens in the contract
+    const totalTokens = 215; // Total number of tokens in the contract
     const grid = document.getElementById('nft-grid');
     grid.innerHTML = ''; // Clear previous content
 
