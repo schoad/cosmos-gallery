@@ -1,69 +1,104 @@
-// Using ethers.js for Ethereum interactions
 const contractAddress = '0xfa72100827F68d91D7EC34c1Af4B2dfe1ed6Cd35';
-const provider = new ethers.providers.Web3Provider(window.ethereum);
-let signer;
+const contractABI = [
+    // Replace this with your contract's ABI
+    {
+        "constant": true,
+        "inputs": [{"name": "owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "", "type": "uint256"}],
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            { "name": "owner", "type": "address" },
+            { "name": "index", "type": "uint256" }
+        ],
+        "name": "tokenOfOwnerByIndex",
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [{ "name": "tokenId", "type": "uint256" }],
+        "name": "tokenURI",
+        "outputs": [{ "name": "", "type": "string" }],
+        "type": "function"
+    }
+];
+
+let web3;
+let contract;
 
 document.getElementById('connectWallet').addEventListener('click', async () => {
+    if (typeof window.ethereum === "undefined") {
+        alert("No Ethereum wallet detected. Please install MetaMask!");
+        return;
+    }
+
     try {
-        await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
-        await checkNFTs();
+        // Request account access
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+
+        // Initialize web3 instance
+        web3 = new Web3(window.ethereum);
+
+        // Get user's wallet address
+        const accounts = await web3.eth.getAccounts();
+        const userAddress = accounts[0];
+        document.getElementById('walletAddress').textContent = `Connected: ${userAddress}`;
+
+        // Initialize contract
+        contract = new web3.eth.Contract(contractABI, contractAddress);
+
+        // Fetch NFTs for the connected wallet
+        fetchNFTs(userAddress);
     } catch (error) {
-        console.error("User denied account access", error);
+        console.error("Error connecting wallet:", error);
+        alert("Failed to connect wallet.");
     }
 });
 
-function setColumns(columns) {
-    document.getElementById('nft-grid').style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
-}
+async function fetchNFTs(userAddress) {
+    try {
+        const balance = await contract.methods.balanceOf(userAddress).call();
 
-async function checkNFTs() {
-    const address = await signer.getAddress();
-    const abi = [
-        'function balanceOf(address owner) view returns (uint256)',
-        'function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)',
-        'function tokenURI(uint256 tokenId) view returns (string memory)'
-    ];
-    const contract = new ethers.Contract(contractAddress, abi, provider);
-    const balance = await contract.balanceOf(address);
-
-    if (balance.toNumber() > 0) {
-        displayNFTs(balance.toNumber(), contract);
-    } else {
-        document.getElementById('nft-grid').innerHTML = '<p>No NFTs found for this contract.</p>';
+        if (parseInt(balance) > 0) {
+            displayNFTs(userAddress, balance);
+        } else {
+            document.getElementById('nft-grid').innerHTML = '<p>No NFTs found for this contract.</p>';
+        }
+    } catch (error) {
+        console.error("Error fetching NFTs:", error);
     }
 }
 
-async function displayNFTs(count, contract) {
+async function displayNFTs(userAddress, balance) {
     const grid = document.getElementById('nft-grid');
     grid.innerHTML = ''; // Clear previous content
 
-    for (let i = 0; i < count; i++) {
-        const tokenId = await contract.tokenOfOwnerByIndex(signer.getAddress(), i);
-        const tokenURI = await contract.tokenURI(tokenId);
-        const metadata = await fetchMetadata(tokenURI);
-       
-        if (metadata && metadata.image) {
-            const div = document.createElement('div');
-            div.className = 'nft-item';
-            const img = document.createElement('img');
-            img.src = metadata.image;
-            img.alt = `NFT ${tokenId}`;
-            img.style.maxWidth = '100%';
-            img.style.maxHeight = '100%';
-            img.draggable = true;
-           
-            div.appendChild(img);
-            div.addEventListener('dragstart', dragStart);
-            div.addEventListener('dragover', dragOver);
-            div.addEventListener('drop', drop);
-           
-            grid.appendChild(div);
+    for (let i = 0; i < balance; i++) {
+        try {
+            const tokenId = await contract.methods.tokenOfOwnerByIndex(userAddress, i).call();
+            const tokenURI = await contract.methods.tokenURI(tokenId).call();
+            const metadata = await fetchMetadata(tokenURI);
+
+            if (metadata && metadata.image) {
+                const div = document.createElement('div');
+                div.className = 'nft-item';
+                const img = document.createElement('img');
+                img.src = metadata.image;
+                img.alt = `NFT ${tokenId}`;
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '100%';
+
+                div.appendChild(img);
+                grid.appendChild(div);
+            }
+        } catch (error) {
+            console.error(`Error fetching metadata for token ${i}:`, error);
         }
     }
-
-    // Default to 2 columns
-    setColumns(2);
 }
 
 async function fetchMetadata(tokenURI) {
@@ -71,27 +106,7 @@ async function fetchMetadata(tokenURI) {
         const response = await fetch(tokenURI);
         return await response.json();
     } catch (error) {
-        console.error('Error fetching metadata:', error);
+        console.error("Error fetching metadata:", error);
         return null;
-    }
-}
-
-// Drag and Drop functionality
-function dragStart(e) {
-    e.dataTransfer.setData('text/plain', e.target.id || e.target.parentElement.id);
-    setTimeout(() => (e.target.style.visibility = "hidden"), 0);
-}
-
-function dragOver(e) {
-    e.preventDefault();
-}
-
-function drop(e) {
-    e.preventDefault();
-    const data = e.dataTransfer.getData('text/plain');
-    const draggedElement = document.getElementById(data) || e.target.parentElement;
-    if (draggedElement) {
-        draggedElement.style.visibility = '';
-        e.target.parentElement.insertBefore(draggedElement, e.target);
     }
 }
