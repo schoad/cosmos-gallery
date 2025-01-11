@@ -55,7 +55,7 @@ async function displayNFTs(userAddress) {
 
     let userTokens = []; // Array to store token IDs owned by the user
 
-    for (let tokenId = 0; tokenId < totalTokens; tokenId++) {
+    for (let tokenId = 1; tokenId <= totalTokens; tokenId++) {
         try {
             const owner = await contract.methods.ownerOf(tokenId).call();
             if (owner.toLowerCase() === userAddress.toLowerCase()) {
