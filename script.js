@@ -83,17 +83,28 @@ async function displayNFTs(userAddress, balance) {
             const tokenURI = await contract.methods.tokenURI(tokenId).call();
             const metadata = await fetchMetadata(tokenURI);
 
+            console.log(`Metadata for token ${tokenId}:`, metadata);
+
             if (metadata && metadata.image) {
                 const div = document.createElement('div');
                 div.className = 'nft-item';
+
                 const img = document.createElement('img');
                 img.src = metadata.image;
-                img.alt = `NFT ${tokenId}`;
+                img.alt = metadata.name || `NFT ${tokenId}`;
                 img.style.maxWidth = '100%';
                 img.style.maxHeight = '100%';
 
+                const name = document.createElement('p');
+                name.textContent = metadata.name || `Token #${tokenId}`;
+                name.style.marginTop = '10px';
+                name.style.color = '#fff';
+
                 div.appendChild(img);
+                div.appendChild(name);
                 grid.appendChild(div);
+            } else {
+                console.error(`No image found for token ${tokenId}`);
             }
         } catch (error) {
             console.error(`Error fetching metadata for token ${i}:`, error);
@@ -104,9 +115,14 @@ async function displayNFTs(userAddress, balance) {
 async function fetchMetadata(tokenURI) {
     try {
         const response = await fetch(tokenURI);
-        return await response.json();
+        if (!response.ok) {
+            console.error(`Failed to fetch metadata from ${tokenURI}, status: ${response.status}`);
+            return null;
+        }
+        const metadata = await response.json();
+        return metadata;
     } catch (error) {
-        console.error("Error fetching metadata:", error);
+        console.error('Error fetching metadata:', error);
         return null;
     }
 }
